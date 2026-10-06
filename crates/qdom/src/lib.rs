@@ -3,46 +3,62 @@
 extern crate alloc;
 
 use alloc::{vec, vec::Vec};
-use core::num::NonZeroUsize;
+use core::{mem, num::NonZeroUsize};
 
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NodeId(NonZeroUsize);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NodeHandle {
+    id: NonZeroUsize,
+    generation: usize,
+}
 
-impl From<usize> for NodeId {
+// optimization check (no tag)
+const _: () = assert!(size_of::<Option<NodeHandle>>() <= size_of::<usize>() * 2);
+
+impl NodeHandle {
     #[inline]
-    fn from(value: usize) -> Self {
-        NodeId(NonZeroUsize::new(value).expect("expected non-zero for NodeId"))
+    fn new(value: usize, generation: usize) -> Self {
+        NodeHandle {
+            id: NonZeroUsize::new(value).expect("expected non-zero for NodeId"),
+            generation,
+        }
+    }
+
+    /// Get the raw ID of the handle.
+    #[inline]
+    pub fn id(&self) -> usize {
+        self.id.get()
     }
 }
 
-impl From<NodeId> for usize {
-    #[inline]
-    fn from(value: NodeId) -> Self {
-        value.0.get()
-    }
-}
-
-impl NodeId {
-    #[inline]
-    fn new(x: usize) -> Self {
-        x.into()
-    }
-}
-
-// pub struct NodeRef();
-
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Node {
-    pub previous: Option<NodeId>,
-    pub next: Option<NodeId>,
-    pub first_child: Option<NodeId>,
-    pub parent: Option<NodeId>,
+    pub previous: Option<NodeHandle>,
+    pub next: Option<NodeHandle>,
+    pub first_child: Option<NodeHandle>,
+    pub parent: Option<NodeHandle>,
+}
+
+enum Allocation<T> {
+    Unallocated,
+    Allocated(T),
+}
+
+impl<T> Allocation<T> {
+    fn patch_alloc(&mut self, value: T) -> Allocation<T> {
+        // source: [`Option::replace`]
+        mem::replace(self, Allocation::Allocated(value))
+    }
+
+    fn mark_unallocated(&mut self) -> Allocation<T> {
+        // source: [`Option::take`]
+        mem::replace(self, Allocation::Unallocated)
+    }
 }
 
 pub struct Dom {
-    arena: Vec<Option<Node>>,
-    vacancies: Vec<NodeId>,
+    arena: Vec<Allocation<Node>>,
+    generations: Vec<usize>,
+    vacancies: Vec<NodeHandle>,
 }
 
 impl Default for Dom {
@@ -51,10 +67,60 @@ impl Default for Dom {
         Self {
             arena: vec![
                 // this is intentional, soley to comply with the NonZero guarantee
-                None,
+                Allocation::Unallocated,
+            ],
+            generations: vec![
+                // same as the above
+                0,
             ],
             vacancies: vec![],
         }
+    }
+}
+
+impl Dom {
+    fn update_generation(&mut self, id: usize) -> usize {
+        let handle = self
+            .generations
+            .get_mut(id)
+            .expect("expected index to exist");
+
+        *handle = handle.wrapping_add(1);
+        *handle
+    }
+
+    fn check_generation(&self, handle: NodeHandle) -> Option<()> {
+        if handle.generation == *self.generations.get(handle.id())? {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn get_node(&self, handle: NodeHandle) -> Option<&Node> {
+        self.arena.get(handle.id()).and_then(|item| {
+            if let Allocation::Allocated(node_ref) = item {
+                Some(node_ref)
+            } else {
+                None
+            }
+        })
+    }
+
+    fn get_node_mut(&mut self, handle: NodeHandle) -> Option<&mut Node> {
+        self.arena.get_mut(handle.id()).and_then(|item| {
+            if let Allocation::Allocated(node_ref) = item {
+                Some(node_ref)
+            } else {
+                None
+            }
+        })
+    }
+
+    fn deallocate(&mut self, handle: NodeHandle) -> Option<()> {
+        self.arena.get_mut(handle.id())?.mark_unallocated();
+        self.update_generation(handle.id());
+        Some(())
     }
 }
 
@@ -64,32 +130,75 @@ impl Dom {
         Self::default()
     }
 
-    pub fn insert(&mut self, node: Node) -> NodeId {
+    pub fn insert(&mut self, node: Node) -> NodeHandle {
         match self.vacancies.pop() {
-            Some(vacancy) => {
-                let index: usize = vacancy.into();
+            Some(vacancy_id) => {
                 let handle = self
                     .arena
-                    .get_mut(index)
+                    .get_mut(vacancy_id.id())
                     .expect("last vacancy did not give a valid index");
 
-                handle.replace(node);
-                vacancy
+                // since we replaced it, the previous one is dead
+                handle.patch_alloc(node);
+                self.update_generation(vacancy_id.id());
+
+                vacancy_id
             }
 
             None => {
-                self.arena.push(Some(node));
-                NodeId::new(self.arena.len() - 1)
+                // these two MUST be tied together
+                self.arena.push(Allocation::Allocated(node));
+                self.generations.push(0);
+
+                NodeHandle::new(
+                    self.arena.len() - 1, // index
+                    0,                    // 0th generation
+                )
             }
         }
     }
 
-    // pub fn remove(&mut self, node: Node) {}
+    pub fn remove(&mut self, handle: NodeHandle) -> Option<()> {
+        self.check_generation(handle)?;
+
+        let node = self.get_node(handle)?;
+
+        // up/down
+        let maybe_parent_handle = node.parent;
+        let maybe_prev_handle = node.previous;
+        let maybe_next_handle = node.next;
+
+        if let Some(parent_handle) = maybe_parent_handle
+            && let Some(parent) = self.get_node_mut(parent_handle)
+            && parent
+                .first_child
+                .is_some_and(|child| child.id() == handle.id())
+        {
+            parent.first_child = maybe_next_handle;
+        }
+
+        // left/right
+        if let Some(prev) = maybe_prev_handle.and_then(|prev| self.get_node_mut(prev)) {
+            let _ = mem::replace(&mut prev.next, maybe_next_handle);
+        }
+        if let Some(next) = maybe_next_handle.and_then(|next| self.get_node_mut(next)) {
+            next.previous = maybe_prev_handle;
+        }
+
+        // deallocate
+        self.deallocate(handle);
+
+        Some(())
+    }
+
+    pub fn exists(&self, node: NodeHandle) -> bool {
+        self.check_generation(node).is_some()
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::NodeId;
+    use crate::NodeHandle;
 
     use super::{Dom, Node};
 
@@ -99,6 +208,28 @@ mod tests {
     fn nonzero_compliance() {
         let mut dom = Dom::new();
         let id = dom.insert(Node::default());
-        assert_eq!(id, NodeId::new(1));
+        assert_eq!(id, NodeHandle::new(1, 0));
+    }
+
+    #[test]
+    fn basic_insert_remove() {
+        let mut dom = Dom::new();
+
+        let child = dom.insert(Node::default());
+        let prev = dom.insert(Node::default());
+        let next = dom.insert(Node::default());
+
+        let first = Node {
+            first_child: Some(child),
+            previous: Some(prev),
+            next: Some(next),
+            ..Default::default()
+        };
+        let first = dom.insert(first);
+
+        dom.remove(first);
+
+        assert!(!dom.exists(first));
+        assert!(dom.get_node(prev).unwrap().next.unwrap() == next)
     }
 }
