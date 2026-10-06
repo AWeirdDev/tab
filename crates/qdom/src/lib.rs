@@ -58,7 +58,7 @@ impl<T> Allocation<T> {
 pub struct Dom {
     arena: Vec<Allocation<Node>>,
     generations: Vec<usize>,
-    vacancies: Vec<NodeHandle>,
+    vacancies: Vec<usize>,
 }
 
 impl Default for Dom {
@@ -120,6 +120,7 @@ impl Dom {
     fn deallocate(&mut self, handle: NodeHandle) -> Option<()> {
         self.arena.get_mut(handle.id())?.mark_unallocated();
         self.update_generation(handle.id());
+        self.vacancies.push(handle.id());
         Some(())
     }
 }
@@ -135,14 +136,14 @@ impl Dom {
             Some(vacancy_id) => {
                 let handle = self
                     .arena
-                    .get_mut(vacancy_id.id())
+                    .get_mut(vacancy_id)
                     .expect("last vacancy did not give a valid index");
 
                 // since we replaced it, the previous one is dead
                 handle.patch_alloc(node);
-                self.update_generation(vacancy_id.id());
+                let generation = self.update_generation(vacancy_id);
 
-                vacancy_id
+                ModeHandle::new(vacancy_id, generation)
             }
 
             None => {
