@@ -143,7 +143,7 @@ impl Dom {
                 handle.patch_alloc(node);
                 let generation = self.update_generation(vacancy_id);
 
-                ModeHandle::new(vacancy_id, generation)
+                NodeHandle::new(vacancy_id, generation)
             }
 
             None => {
