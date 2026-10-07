@@ -35,6 +35,7 @@ pub struct Node {
     pub previous: Option<NodeHandle>,
     pub next: Option<NodeHandle>,
     pub first_child: Option<NodeHandle>,
+    pub last_child: Option<NodeHandle>,
     pub parent: Option<NodeHandle>,
 }
 
@@ -187,6 +188,15 @@ impl Dom {
         {
             parent.first_child = maybe_next_handle;
         }
+        if let Some(parent_handle) = maybe_parent_handle
+            && let Some(parent) = self.get_node_mut(parent_handle)
+            && parent
+                .last_child
+                .is_some_and(|child| child.id() == handle.id())
+        {
+            parent.last_child = maybe_prev_handle;
+        }
+        
 
         // left/right
         if let Some(prev) = maybe_prev_handle.and_then(|prev| self.get_node_mut(prev)) {
