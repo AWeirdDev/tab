@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use alloc::{vec, vec::Vec};
+use alloc::{string::String, vec::Vec};
 use core::{mem, num::NonZeroUsize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -30,6 +30,34 @@ impl NodeHandle {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum NodeData {
+    Text(String),
+    Element {
+        tag: String,
+        attributes: AttributesList,
+    },
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct AttributesList(Vec<Attribute>);
+
+impl AttributesList {
+    /// Get an attribute.
+    ///
+    /// # Time complexity
+    /// O(N), unoptimized
+    pub fn get(&self, key: &str) -> Option<&Attribute> {
+        self.0.iter().find(|attr| attr.name.eq(key))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Attribute {
+    name: String,
+    key: String,
+}
+
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Node {
     pub previous: Option<NodeHandle>,
@@ -37,6 +65,7 @@ pub struct Node {
     pub first_child: Option<NodeHandle>,
     pub last_child: Option<NodeHandle>,
     pub parent: Option<NodeHandle>,
+    pub data: Option<NodeData>,
 }
 
 enum Allocation<T> {
@@ -65,6 +94,9 @@ pub struct Dom {
 impl Default for Dom {
     #[inline]
     fn default() -> Self {
+        // rust-anaylzer keeps getting it wrong, i'll make it local
+        use alloc::vec;
+
         Self {
             arena: vec![
                 // this is intentional, soley to comply with the NonZero guarantee
