@@ -139,7 +139,7 @@ impl Dom {
     /// will be marked as "unallocated," and that spot may be
     /// reused in future append operations.
     ///
-    /// This function is the building block of all node 
+    /// This function is the building block of all node
     /// insertion methods.
     pub fn append(&mut self, node: Node) -> NodeHandle {
         match self.vacancies.pop() {
