@@ -235,10 +235,10 @@ impl Dom {
         node.previous = last_child;
 
         {
-            let mut cursor = node;
+            let mut cursor = Some(&mut node);
             while let Some(next) = cursor {
                 next.parent = Some(parent_handle);
-                cursor = self.get_node(next.next);
+                cursor = next.next.and_then(|next_node| self.get_node_mut(next_node));
             }
         }
 
@@ -298,13 +298,29 @@ mod tests {
         let mut dom = Dom::new();
 
         let document = dom.allocate(Node::default());
-        let inner = dom.append_child_in(Node::default(), document).unwrap();
+        let another = dom.allocate(Node::default());
+        let inner = dom
+            .append_child_in(
+                Node {
+                    next: Some(another),
+                    ..Default::default()
+                },
+                document,
+            )
+            .unwrap();
 
         assert_eq!(
             dom.get_node(document).unwrap(),
             &Node {
                 first_child: Some(inner),
                 last_child: Some(inner),
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            dom.get_node(another).unwrap(),
+            &Node {
+                parent: Some(document),
                 ..Default::default()
             }
         );
