@@ -60,12 +60,33 @@ pub struct Attribute {
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Node {
-    pub previous: Option<NodeHandle>,
-    pub next: Option<NodeHandle>,
-    pub first_child: Option<NodeHandle>,
-    pub last_child: Option<NodeHandle>,
-    pub parent: Option<NodeHandle>,
+    previous: Option<NodeHandle>,
+    next: Option<NodeHandle>,
+    first_child: Option<NodeHandle>,
+    last_child: Option<NodeHandle>,
+    parent: Option<NodeHandle>,
     pub data: Option<NodeData>,
+}
+
+macro_rules! node_get_impl {
+    ($fld:ident) => {
+        #[doc = "Get the handle for `"]
+        #[doc = stringify!($fld)]
+        #[doc = "`.\n\nIf `None` is returned, then such item doesn't exist. "]
+        #[doc = "However, there is no guarantee that its generation ID is correct, "]
+        #[doc = "since it might've been deallocated from the arena already."]
+        pub fn $fld(&self) -> Option<&NodeHandle> {
+            self.$fld.as_ref()
+        }
+    };
+}
+
+impl Node {
+    node_get_impl!(previous);
+    node_get_impl!(next);
+    node_get_impl!(first_child);
+    node_get_impl!(last_child);
+    node_get_impl!(parent);
 }
 
 enum Allocation<T> {
@@ -130,17 +151,6 @@ impl Dom {
         }
     }
 
-    fn get_node_mut(&mut self, handle: NodeHandle) -> Option<&mut Node> {
-        self.check_generation(handle)?;
-        self.arena.get_mut(handle.id()).and_then(|item| {
-            if let Allocation::Allocated(node_ref) = item {
-                Some(node_ref)
-            } else {
-                None
-            }
-        })
-    }
-
     fn deallocate(&mut self, handle: NodeHandle) -> Option<()> {
         self.arena.get_mut(handle.id())?.mark_unallocated();
         self.update_generation(handle.id());
@@ -155,7 +165,7 @@ impl Dom {
         Self::default()
     }
 
-    /// Get a node from its handle.
+    /// Get a node reference from its handle.
     ///
     /// Returns `None` if one of the following is satisfied:
     /// - It's marked as unallocated
@@ -164,6 +174,23 @@ impl Dom {
     pub fn get_node(&self, handle: NodeHandle) -> Option<&Node> {
         self.check_generation(handle)?;
         self.arena.get(handle.id()).and_then(|item| {
+            if let Allocation::Allocated(node_ref) = item {
+                Some(node_ref)
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Get a mutable node reference from its handle.
+    ///
+    /// Returns `None` if one of the following is satisfied:
+    /// - It's marked as unallocated
+    /// - It doesn't exist in the arena
+    /// - Its generation ID mismatches the current one
+    pub fn get_node_mut(&mut self, handle: NodeHandle) -> Option<&mut Node> {
+        self.check_generation(handle)?;
+        self.arena.get_mut(handle.id()).and_then(|item| {
             if let Allocation::Allocated(node_ref) = item {
                 Some(node_ref)
             } else {
