@@ -131,7 +131,17 @@ impl Dom {
         Self::default()
     }
 
-    pub fn insert(&mut self, node: Node) -> NodeHandle {
+    /// Append a node, regardless of whether it's detached.
+    /// This function only guarantees that the node provided
+    /// will be allocated on the arena.
+    ///
+    /// To save space and avoid reallocation, removed nodes
+    /// will be marked as "unallocated," and that spot may be
+    /// reused in future append operations.
+    ///
+    /// This function is the building block of all node 
+    /// insertion methods.
+    pub fn append(&mut self, node: Node) -> NodeHandle {
         match self.vacancies.pop() {
             Some(vacancy_id) => {
                 let handle = self
@@ -208,7 +218,7 @@ mod tests {
     #[test]
     fn nonzero_compliance() {
         let mut dom = Dom::new();
-        let id = dom.insert(Node::default());
+        let id = dom.append(Node::default());
         assert_eq!(id, NodeHandle::new(1, 0));
     }
 
@@ -216,9 +226,9 @@ mod tests {
     fn basic_insert_remove() {
         let mut dom = Dom::new();
 
-        let child = dom.insert(Node::default());
-        let prev = dom.insert(Node::default());
-        let next = dom.insert(Node::default());
+        let child = dom.append(Node::default());
+        let prev = dom.append(Node::default());
+        let next = dom.append(Node::default());
 
         let first = Node {
             first_child: Some(child),
@@ -226,7 +236,7 @@ mod tests {
             next: Some(next),
             ..Default::default()
         };
-        let first = dom.insert(first);
+        let first = dom.append(first);
 
         dom.remove(first);
 
