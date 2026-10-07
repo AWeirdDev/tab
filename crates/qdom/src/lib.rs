@@ -98,6 +98,7 @@ impl Dom {
     }
 
     fn get_node(&self, handle: NodeHandle) -> Option<&Node> {
+        self.check_generation(handle)?;
         self.arena.get(handle.id()).and_then(|item| {
             if let Allocation::Allocated(node_ref) = item {
                 Some(node_ref)
@@ -108,6 +109,7 @@ impl Dom {
     }
 
     fn get_node_mut(&mut self, handle: NodeHandle) -> Option<&mut Node> {
+        self.check_generation(handle)?;
         self.arena.get_mut(handle.id()).and_then(|item| {
             if let Allocation::Allocated(node_ref) = item {
                 Some(node_ref)
@@ -170,8 +172,6 @@ impl Dom {
     }
 
     pub fn remove(&mut self, handle: NodeHandle) -> Option<()> {
-        self.check_generation(handle)?;
-
         let node = self.get_node(handle)?;
 
         // up/down
