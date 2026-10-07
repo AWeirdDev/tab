@@ -30,7 +30,7 @@ impl NodeHandle {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Node {
     pub previous: Option<NodeHandle>,
     pub next: Option<NodeHandle>,
@@ -214,6 +214,40 @@ impl Dom {
     pub fn exists(&self, node: NodeHandle) -> bool {
         self.check_generation(node).is_some()
     }
+
+    /// Append a child in a node.
+    ///
+    /// It's worth noting that nothing other than the given node's
+    /// `parent` and `previous` fields are changed in order to support
+    /// fragments.
+    ///
+    /// # Parameters
+    /// - `node`: The owned node to allocate and insert into the DOM.
+    /// - `parent_handle`: The handle of the reference parent node.
+    ///
+    /// For more information on allocation, see [`Dom::allocate`]
+    pub fn append_child_in(
+        &mut self,
+        mut node: Node,
+        parent_handle: NodeHandle,
+    ) -> Option<NodeHandle> {
+        let last_child = self.get_node(parent_handle)?.last_child;
+
+        node.parent = Some(parent_handle);
+        node.previous = last_child;
+
+        let node_handle = self.allocate(node);
+
+        if let Some(prev) = last_child.and_then(|last_handle| self.get_node_mut(last_handle)) {
+            prev.next = Some(node_handle);
+        }
+
+        let parent = self.get_node_mut(parent_handle)?;
+        parent.first_child.get_or_insert(node_handle);
+        parent.last_child = Some(node_handle);
+
+        Some(node_handle)
+    }
 }
 
 #[cfg(test)]
@@ -250,6 +284,23 @@ mod tests {
         dom.remove(first);
 
         assert!(!dom.exists(first));
-        assert!(dom.get_node(prev).unwrap().next.unwrap() == next)
+        assert_eq!(dom.get_node(prev).unwrap().next.unwrap(), next);
+    }
+
+    #[test]
+    fn basic_append() {
+        let mut dom = Dom::new();
+
+        let document = dom.allocate(Node::default());
+        let inner = dom.append_child_in(Node::default(), document).unwrap();
+
+        assert_eq!(
+            dom.get_node(document).unwrap(),
+            &Node {
+                first_child: Some(inner),
+                last_child: Some(inner),
+                ..Default::default()
+            }
+        );
     }
 }
