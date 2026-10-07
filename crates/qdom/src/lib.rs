@@ -233,7 +233,7 @@ impl Dom {
     ) -> Option<NodeHandle> {
         let last_child = self.get_node(parent_handle)?.last_child;
         node.previous = last_child;
-        
+
         {
             let mut cursor = node;
             while let Some(next) = cursor {
