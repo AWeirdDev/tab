@@ -98,17 +98,6 @@ impl Dom {
         }
     }
 
-    fn get_node(&self, handle: NodeHandle) -> Option<&Node> {
-        self.check_generation(handle)?;
-        self.arena.get(handle.id()).and_then(|item| {
-            if let Allocation::Allocated(node_ref) = item {
-                Some(node_ref)
-            } else {
-                None
-            }
-        })
-    }
-
     fn get_node_mut(&mut self, handle: NodeHandle) -> Option<&mut Node> {
         self.check_generation(handle)?;
         self.arena.get_mut(handle.id()).and_then(|item| {
@@ -132,6 +121,23 @@ impl Dom {
     #[inline]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Get a node from its handle.
+    ///
+    /// Returns `None` if one of the following is satisfied:
+    /// - It's marked as unallocated
+    /// - It doesn't exist in the arena
+    /// - Its generation ID mismatches the current one
+    pub fn get_node(&self, handle: NodeHandle) -> Option<&Node> {
+        self.check_generation(handle)?;
+        self.arena.get(handle.id()).and_then(|item| {
+            if let Allocation::Allocated(node_ref) = item {
+                Some(node_ref)
+            } else {
+                None
+            }
+        })
     }
 
     /// Allocate a node, regardless of whether it's detached.
@@ -233,6 +239,7 @@ impl Dom {
     ) -> Option<NodeHandle> {
         let last_child = self.get_node(parent_handle)?.last_child;
         node.previous = last_child;
+        node.parent = Some(parent_handle);
 
         {
             let mut cursor = Some(&mut node);
@@ -251,6 +258,74 @@ impl Dom {
         let parent = self.get_node_mut(parent_handle)?;
         parent.first_child.get_or_insert(node_handle);
         parent.last_child = Some(node_handle);
+
+        Some(node_handle)
+    }
+
+    /// Insert a node after a reference node.
+    pub fn insert_after(&mut self, node: Node, reference_handle: NodeHandle) -> Option<NodeHandle> {
+        let reference = self.get_node(reference_handle)?;
+        let reference_parent_handle = reference.parent;
+        let reference_orig_next_handle = reference.next;
+
+        let node_handle = self.allocate(node);
+
+        // left
+        let reference = self.get_node_mut(reference_handle)?;
+        reference.next = Some(node_handle);
+
+        // middle
+        let node = self.get_node_mut(node_handle)?;
+        node.previous = Some(reference_handle);
+        node.parent = reference_parent_handle;
+        node.next = reference_orig_next_handle;
+
+        // right
+        if let Some(reference_orig_next) =
+            reference_orig_next_handle.and_then(|on| self.get_node_mut(on))
+        {
+            reference_orig_next.previous = Some(node_handle);
+        } else if let Some(parent) = reference_parent_handle.and_then(|h| self.get_node_mut(h)) {
+            // reference was the last child
+            // the new node is now the last child
+            parent.last_child = Some(node_handle);
+        }
+
+        Some(node_handle)
+    }
+
+    /// Insert a node before a reference node.
+    pub fn insert_before(
+        &mut self,
+        node: Node,
+        reference_handle: NodeHandle,
+    ) -> Option<NodeHandle> {
+        let reference = self.get_node(reference_handle)?;
+        let reference_parent_handle = reference.parent;
+        let reference_orig_prev_handle = reference.previous;
+
+        let node_handle = self.allocate(node);
+
+        // right
+        let reference = self.get_node_mut(reference_handle)?;
+        reference.previous = Some(node_handle);
+
+        // middle
+        let node = self.get_node_mut(node_handle)?;
+        node.next = Some(reference_handle);
+        node.parent = reference_parent_handle;
+        node.previous = reference_orig_prev_handle;
+
+        // left
+        if let Some(reference_orig_prev) =
+            reference_orig_prev_handle.and_then(|on| self.get_node_mut(on))
+        {
+            reference_orig_prev.next = Some(node_handle);
+        } else if let Some(parent) = reference_parent_handle.and_then(|h| self.get_node_mut(h)) {
+            // reference was the first child
+            // the new node is now the first child
+            parent.first_child = Some(node_handle);
+        }
 
         Some(node_handle)
     }
@@ -294,26 +369,18 @@ mod tests {
     }
 
     #[test]
-    fn basic_append() {
+    fn basic_operations() {
         let mut dom = Dom::new();
 
         let document = dom.allocate(Node::default());
-        let another = dom.allocate(Node::default());
-        let inner = dom
-            .append_child_in(
-                Node {
-                    next: Some(another),
-                    ..Default::default()
-                },
-                document,
-            )
-            .unwrap();
+        let inner = dom.append_child_in(Node::default(), document).unwrap();
+        let another = dom.insert_after(Node::default(), inner).unwrap();
 
         assert_eq!(
             dom.get_node(document).unwrap(),
             &Node {
                 first_child: Some(inner),
-                last_child: Some(inner),
+                last_child: Some(another),
                 ..Default::default()
             }
         );
@@ -321,6 +388,7 @@ mod tests {
             dom.get_node(another).unwrap(),
             &Node {
                 parent: Some(document),
+                previous: Some(inner),
                 ..Default::default()
             }
         );
