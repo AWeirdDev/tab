@@ -225,16 +225,22 @@ impl Dom {
     /// - `node`: The owned node to allocate and insert into the DOM.
     /// - `parent_handle`: The handle of the reference parent node.
     ///
-    /// For more information on allocation, see [`Dom::allocate`]
+    /// For more information on allocation, see [`Dom::allocate`].
     pub fn append_child_in(
         &mut self,
         mut node: Node,
         parent_handle: NodeHandle,
     ) -> Option<NodeHandle> {
         let last_child = self.get_node(parent_handle)?.last_child;
-
-        node.parent = Some(parent_handle);
         node.previous = last_child;
+        
+        {
+            let mut cursor = node;
+            while let Some(next) = cursor {
+                next.parent = Some(parent_handle);
+                cursor = self.get_node(next.next);
+            }
+        }
 
         let node_handle = self.allocate(node);
 
