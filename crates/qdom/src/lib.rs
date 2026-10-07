@@ -196,7 +196,6 @@ impl Dom {
         {
             parent.last_child = maybe_prev_handle;
         }
-        
 
         // left/right
         if let Some(prev) = maybe_prev_handle.and_then(|prev| self.get_node_mut(prev)) {
