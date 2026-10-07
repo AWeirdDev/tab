@@ -75,8 +75,8 @@ macro_rules! node_get_impl {
         #[doc = "`.\n\nIf `None` is returned, then such item doesn't exist. "]
         #[doc = "However, there is no guarantee that its generation ID is correct, "]
         #[doc = "since it might've been deallocated from the arena already."]
-        pub fn $fld(&self) -> Option<&NodeHandle> {
-            self.$fld.as_ref()
+        pub fn $fld(&self) -> Option<NodeHandle> {
+            self.$fld
         }
     };
 }
@@ -237,13 +237,16 @@ impl Dom {
         }
     }
 
+    /// Remove a node, trimming off any relations to it before
+    /// deallocating it from the arena.
     pub fn remove(&mut self, handle: NodeHandle) -> Option<()> {
         let node = self.get_node(handle)?;
 
-        // up/down
+        // up
         let maybe_parent_handle = node.parent;
         let maybe_prev_handle = node.previous;
         let maybe_next_handle = node.next;
+        let maybe_first_child_handle = node.first_child();
 
         if let Some(parent_handle) = maybe_parent_handle
             && let Some(parent) = self.get_node_mut(parent_handle)
@@ -260,6 +263,15 @@ impl Dom {
                 .is_some_and(|child| child.id() == handle.id())
         {
             parent.last_child = maybe_prev_handle;
+        }
+
+        // down
+        {
+            let mut cursor = maybe_first_child_handle.and_then(|fc| self.get_node_mut(fc));
+            while let Some(ref mut child) = cursor {
+                child.parent = None;
+                cursor = child.next.and_then(|next| self.get_node_mut(next));
+            }
         }
 
         // left/right
