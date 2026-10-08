@@ -456,22 +456,26 @@ mod tests {
         let inner = dom.allocate(Node::default());
         dom.append_child_in(inner, document).unwrap();
 
+        let inner_other = dom.allocate(Node::default());
+        dom.insert_after(inner_other, inner);
+
         let another = dom.allocate(Node::default());
-        dom.insert_after(another, inner).unwrap();
+        dom.insert_before(another, inner).unwrap();
 
         assert_eq!(
             dom.get_node(document).unwrap(),
             &Node {
-                first_child: Some(inner),
-                last_child: Some(another),
+                first_child: Some(another),
+                last_child: Some(inner_other),
                 ..Default::default()
             }
         );
         assert_eq!(
-            dom.get_node(another).unwrap(),
+            dom.get_node(inner).unwrap(),
             &Node {
                 parent: Some(document),
-                previous: Some(inner),
+                previous: Some(another),
+                next: Some(inner_other),
                 ..Default::default()
             }
         );
