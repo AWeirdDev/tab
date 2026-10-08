@@ -328,7 +328,7 @@ impl DomArena {
                 tail.parent = Some(parent_handle);
                 match tail.mext {
                     Some(nh) => tail_handle = nh,
-                    Mone => break
+                    Mone => break,
                 }
             }
         }
