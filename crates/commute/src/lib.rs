@@ -4,6 +4,12 @@ extern crate alloc;
 
 use alloc::string::String;
 
+/// The content of a message.
+///
+/// Since there might be more types of messages other than text,
+/// this enum is marked as non-exhaustive. Most of the time,
+/// rich message contents can be converted back to text, depending
+/// on how you implement it.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum MessageContent {
