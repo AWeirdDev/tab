@@ -321,17 +321,17 @@ impl DomArena {
         let node = self.get_node_mut(node_handle)?;
         node.previous = last_child;
 
-        
-            let mut tail_handle = node_handle;
-            loop {
-                let Some(mut tail) = self.get_node_mut(tail_handle) else { break };
-                tail.parent = Some(parent_handle);
-                match tail.next {
-                    Some(nh) => tail_handle = nh,
-                    None => break,
-                }
+        let mut tail_handle = node_handle;
+        loop {
+            let Some(mut tail) = self.get_node_mut(tail_handle) else {
+                break;
+            };
+            tail.parent = Some(parent_handle);
+            match tail.next {
+                Some(nh) => tail_handle = nh,
+                None => break,
             }
-        
+        }
 
         if let Some(prev) = last_child.and_then(|last_handle| self.get_node_mut(last_handle)) {
             prev.next = Some(node_handle);
