@@ -322,10 +322,7 @@ impl DomArena {
         node.previous = last_child;
 
         let mut tail_handle = node_handle;
-        loop {
-            let Some(mut tail) = self.get_node_mut(tail_handle) else {
-                break;
-            };
+        while let Some(tail) = self.get_node_mut(tail_handle) {
             tail.parent = Some(parent_handle);
             match tail.next {
                 Some(nh) => tail_handle = nh,

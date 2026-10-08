@@ -36,12 +36,18 @@ pub struct Dom {
     inner: DomInner,
 }
 
-impl Dom {
-    pub fn new() -> Self {
+impl Default for Dom {
+    fn default() -> Self {
         let arena = DomArena::new();
         Self {
             inner: Rc::new(RefCell::new(arena)),
         }
+    }
+}
+
+impl Dom {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub(crate) fn allocate(&self, node: Node) -> NodeHandle {
@@ -105,7 +111,7 @@ impl<M> GenericNode<M> {
 
     fn apply<T>(&self, f: impl FnOnce(&mut Node) -> T) -> Option<T> {
         let mut arena = self.arena.borrow_mut();
-        arena.get_node_mut(self.handle).map(|n| f(n))
+        arena.get_node_mut(self.handle).map(f)
     }
 
     /// Erase type information (the marker) of this node. Some might
@@ -160,7 +166,7 @@ impl<M: _Appendable> GenericNode<M> {
         let head = nodes.next()?;
 
         let mut prev = head.handle;
-        while let Some(node_ref) = nodes.next() {
+        for node_ref in nodes {
             arena.insert_after(node_ref.handle, prev);
             prev = node_ref.handle;
         }
