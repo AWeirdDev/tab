@@ -320,13 +320,16 @@ impl DomArena {
         let last_child = self.get_node(parent_handle)?.last_child;
         let node = self.get_node_mut(node_handle)?;
         node.previous = last_child;
-        node.parent = Some(parent_handle);
 
         {
-            let mut cursor = Some(node);
-            while let Some(next) = cursor {
-                next.parent = Some(parent_handle);
-                cursor = next.next.and_then(|next_node| self.get_node_mut(next_node));
+            let mut tail_handle = node_handle;
+            loop {
+                let mut tail = self.get_node_mut(tail_handle);
+                tail.parent = Some(parent_handle);
+                match tail.mext {
+                    Some(nh) => tail_handle = nh,
+                    Mone => break
+                }
             }
         }
 
@@ -336,7 +339,7 @@ impl DomArena {
 
         let parent = self.get_node_mut(parent_handle)?;
         parent.first_child.get_or_insert(node_handle);
-        parent.last_child = Some(node_handle);
+        parent.last_child = Some(tail_handle);
 
         Some(())
     }
