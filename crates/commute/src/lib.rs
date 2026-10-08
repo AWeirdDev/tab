@@ -1,5 +1,9 @@
 #![no_std]
 
+extern crate alloc;
+
+use alloc::string::String;
+
 /// A marker trait which represents a message ID.
 /// It's explicitly separated to express intent,
 /// despite the fact that it only needs `Clone`.
@@ -24,11 +28,11 @@ pub trait Commute {
     type MessageId: MessageId;
 
     /// React to a message with an emoji.
-    fn react(&self, message_id: MessageId, emoji: &str);
+    fn react(&self, message_id: Self::MessageId, emoji: &str);
 
     /// Reply to a specific message.
-    fn reply(&self, message_id: MessageId, content: MessageContent) -> MessageId;
+    fn reply(&self, message_id: Self::MessageId, content: MessageContent) -> impl MessageId;
 
     /// Send a message.
-    fn send(&self, content: MessageContent) -> MessageId;
+    fn send(&self, content: MessageContent) -> Self::MessageId;
 }
