@@ -3,7 +3,7 @@
 /// A marker trait which represents a message ID.
 /// It's explicitly separated to express intent,
 /// despite the fact that it only needs `Clone`.
-pub trait MessageId: Clone {};
+pub trait MessageId: Clone {}
 
 #[derive(Debug, Clone)]
 pub enum MessageContent {
