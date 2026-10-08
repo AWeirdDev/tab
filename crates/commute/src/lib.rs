@@ -1,15 +1,34 @@
 #![no_std]
 
+/// A marker trait which represents a message ID.
+/// It's explicitly separated to express intent,
+/// despite the fact that it only needs `Clone`.
+pub trait MessageId: Clone {};
+
+#[derive(Debug, Clone)]
+pub enum MessageContent {
+    Text(String),
+    Image(String),
+    // File
+    // Interaction
+}
+
 /// A commutable interface.
 ///
 /// Note that all functions should be synchronous.
+///
+/// When the interaction fails, it's the implementer's
+/// job to deal with it, thus there is no `Result` on return.
 pub trait Commute {
+    /// The associated message ID type.
+    type MessageId: MessageId;
+
     /// React to a message with an emoji.
-    fn react(&self, message_id: usize, emoji: &str);
+    fn react(&self, message_id: MessageId, emoji: &str);
 
     /// Reply to a specific message.
-    fn reply(&self, message_id: usize, text: &str);
+    fn reply(&self, message_id: MessageId, content: MessageContent) -> MessageId;
 
     /// Send a message.
-    fn send(&self, text: &str);
+    fn send(&self, content: MessageContent) -> MessageId;
 }
