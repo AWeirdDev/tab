@@ -47,12 +47,17 @@ impl AttributesList {
     pub fn get(&self, key: &str) -> Option<&Attribute> {
         self.0.iter().find(|attr| attr.name.eq(key))
     }
+
+    #[inline]
+    pub fn push(&mut self, attribute: Attribute) {
+        self.0.push(attribute);
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Attribute {
-    name: String,
-    key: String,
+    pub name: String,
+    pub key: String,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
