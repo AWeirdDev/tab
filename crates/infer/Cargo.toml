@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["ollama"]
-ollama = []
+default = ["openai-compat"]
+openai-compat = []
 
 [dependencies]
 async-stream = "0.3.6"

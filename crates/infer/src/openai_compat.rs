@@ -2,18 +2,19 @@ use hyper::Method;
 
 use crate::generic_api::{ChatCompletionOutput, GenericApi, InferError};
 
-// re-export
+// re-exports
 pub use crate::generic_api::{Streaming, TextOnly};
 pub use crate::generic_models::*;
 
-pub struct Ollama {
+/// API compatible with ClosedAI.
+pub struct OpenAiCompat {
     api: GenericApi,
 }
 
-impl Ollama {
-    /// A local Ollama instance.
+impl OpenAiCompat {
+    /// A local instance.
     ///
-    /// The URI is usually `http://localhost:11434/v1`
+    /// For Ollama, the URI is usually `http://localhost:11434/v1`.
     pub fn new_local(uri: &str) -> Result<Self, InferError> {
         Ok(Self {
             api: GenericApi::new("x", uri)?,

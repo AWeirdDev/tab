@@ -1,8 +1,8 @@
-use infer::ollama::*;
+use infer::openai_compat::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let ollama = Ollama::new_local("http://localhost:11434/v1")?;
+    let ollama = OpenAiCompat::new_local("http://localhost:11434/v1")?;
 
     let completion = ollama
         .chat_completion::<TextOnly>(ChatCompletionRequest {

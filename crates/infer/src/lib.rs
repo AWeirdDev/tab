@@ -1,5 +1,5 @@
 pub mod generic_api;
 pub mod generic_models;
 
-#[cfg(feature = "ollama")]
-pub mod ollama;
+#[cfg(feature = "openai-compat")]
+pub mod openai_compat;
