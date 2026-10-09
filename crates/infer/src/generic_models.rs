@@ -195,7 +195,7 @@ impl FunctionCall {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub struct ChatCompletionRequest {
     pub model: String,
     pub messages: Vec<Message>,

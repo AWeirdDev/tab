@@ -1,35 +1,38 @@
+use futures_util::StreamExt;
 use infer::openai_compat::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ollama = OpenAiCompat::new_local("http://localhost:11434/v1")?;
 
-    let completion = ollama
-        .chat_completion::<TextOnly>(ChatCompletionRequest {
+    let mut completion = ollama
+        .chat_completion::<StreamingCompletion>(&ChatCompletionRequest {
             model: "qwen3.5:9b".into(), // sorry for being poor lol
-            messages: vec![Message::User {
-                content: Content::Text(
-                    "Is the world flat? If so, reply with a single 'yes'; 'no' otherwise."
-                        .to_string(),
-                ),
-                name: None,
-            }],
+            messages: vec![
+                Message::System {
+                    content: Content::Text(
+                        "You're tab, an AI agent capable of helping the user with research tasks."
+                            .to_string(),
+                    ),
+                    name: None,
+                },
+                Message::User {
+                    content: Content::Text("Introduce yourself a bit".to_string()),
+                    name: None,
+                },
+            ],
             ..Default::default()
         })
         .await?;
 
-    let message = completion
-        .first_message()
-        .unwrap()
-        .content
-        .as_ref()
-        .unwrap()
-        .text();
-
-    println!("{message}");
-
-    // 10% of the population:
-    // assert_eq!(message, "yes");
+    while let Some(chunk) = completion.next().await {
+        for choice in chunk?.choices {
+            if let Some(text) = choice.delta.content {
+                print!("{text}");
+            }
+        }
+    }
+    println!();
 
     Ok(())
 }
