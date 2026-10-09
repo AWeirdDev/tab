@@ -6,7 +6,7 @@ edition = "2024"
 [workspace]
 members = [
     "crates/commute",
-    "crates/effectio",
+    # "crates/effectio",
     "crates/infer",
     "crates/qdom"
 ]
