@@ -1,0 +1,24 @@
+[package]
+name = "infer"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["ollama"]
+ollama = []
+
+[dependencies]
+async-stream = "0.3.6"
+async-trait = "0.1.92"
+futures-core = "0.3.34"
+http-body-util = "0.1.5"
+hyper = { version = "1.12.0", features = ["client"] }
+hyper-rustls = { version = "0.27.10", features = ["webpki-roots"] }
+hyper-util = { version = "0.1.21", features = [] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+thiserror = "2.0.21"
+
+[dev-dependencies]
+futures-util = "0.3.34"
+tokio = { version = "1.53.2", features = ["rt", "rt-multi-thread", "macros"] }
