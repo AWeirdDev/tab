@@ -2,6 +2,7 @@ use std::{
     ffi::{CString, c_char},
     os::unix::ffi::OsStrExt,
     path::Path,
+    ptr,
 };
 
 use krun_sys as sys;
@@ -9,6 +10,7 @@ use krun_sys as sys;
 use crate::error_primitives::{ReferToLog, fallible};
 
 /// VM configuration context.
+#[derive(Debug)]
 pub struct Context {
     id: u32,
     deconstructors: Vec<Box<dyn std::any::Any>>,
@@ -50,18 +52,33 @@ impl Context {
         Ok(self)
     }
 
-    pub fn with_exec<
-        P: AsRef<Path>,
-        ArgV: Into<impl Iterator<Item = impl AsRef<str>>>,
-        EnvP: Into<impl Iterator<Item = impl AsRef<str>>>,
-    >(
+    pub fn with_exec<P: AsRef<Path>, ArgV>(
+        self,
+        executable: P,
+        argv: ArgV,
+    ) -> Result<Self, ContextError>
+    where
+        ArgV: IntoIterator,
+        ArgV::Item: AsRef<str>,
+    {
+        self.with_exec_envp(executable, argv, &[""; 0])
+    }
+
+    pub fn with_exec_envp<P: AsRef<Path>, ArgV, EnvP>(
         mut self,
         executable: P,
         argv: ArgV,
         envp: EnvP,
-    ) -> Result<Self, ContextError> {
+    ) -> Result<Self, ContextError>
+    where
+        ArgV: IntoIterator,
+        ArgV::Item: AsRef<str>,
+        EnvP: IntoIterator,
+        EnvP::Item: AsRef<str>,
+    {
         let argv_carr = CArrayOfString::new(argv)?;
         let envp_carr = CArrayOfString::new(envp)?;
+
         let exe = cstring_path(executable)?;
 
         unsafe {
@@ -100,9 +117,13 @@ struct CArrayOfString {
 }
 
 impl CArrayOfString {
-    fn new<It: Into<impl Iterator<Item = impl AsRef<str>>>>(it: It) -> Result<Self, ContextError> {
+    fn new<It>(it: It) -> Result<Self, ContextError>
+    where
+        It: IntoIterator,
+        It::Item: AsRef<str>,
+    {
         let container = it
-            .into()
+            .into_iter()
             .map(|item| {
                 Ok(castaway::match_type!(item, {
                     String as s => CString::from_vec_with_nul(s.into_bytes())?,
@@ -115,6 +136,7 @@ impl CArrayOfString {
         for cstring in container.iter().by_ref() {
             view.push(cstring.as_ptr());
         }
+        view.push(ptr::null());
 
         Ok(Self {
             _source: container,
@@ -131,4 +153,27 @@ impl CArrayOfString {
 fn cstring_path<P: AsRef<Path>>(path: P) -> Result<CString, ContextError> {
     let dir = path.as_ref().as_os_str().as_bytes();
     Ok(CString::new(dir)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::assert_matches;
+
+    #[test]
+    fn create_context() -> Result<(), Box<dyn std::error::Error>> {
+        let _ = Context::new()?
+            .with_root("/rootfs")?
+            .with_exec("/bin/sh", &["echo", "\"hello world\""])?
+            .with_vm_config(1, 256)?;
+        Ok(())
+    }
+
+    #[test]
+    fn fail_on_null_terminator() {
+        assert_matches!(
+            Context::new().unwrap().with_root("/rootfs\0"),
+            Err(ContextError::BadCopiedStr(..))
+        );
+    }
 }

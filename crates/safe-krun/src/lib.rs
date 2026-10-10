@@ -1,3 +1,5 @@
+//! Safe bindings to libkrun.
+
 mod error_primitives;
 
 pub mod context;
