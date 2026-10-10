@@ -50,11 +50,15 @@ impl Context {
         Ok(self)
     }
 
-    pub fn with_exec<P: AsRef<Path>>(
+    pub fn with_exec<
+        P: AsRef<Path>,
+        ArgV: Into<impl Iterator<Item = impl AsRef<str>>>,
+        EnvP: Into<impl Iterator<Item = impl AsRef<str>>>,
+    >(
         mut self,
         executable: P,
-        argv: impl Iterator<Item = impl AsRef<str>>,
-        envp: impl Iterator<Item = impl AsRef<str>>,
+        argv: ArgV,
+        envp: EnvP,
     ) -> Result<Self, ContextError> {
         let argv_carr = CArrayOfString::new(argv)?;
         let envp_carr = CArrayOfString::new(envp)?;
@@ -96,8 +100,9 @@ struct CArrayOfString {
 }
 
 impl CArrayOfString {
-    fn new<It: Iterator<Item = impl AsRef<str>>>(it: It) -> Result<Self, ContextError> {
+    fn new<It: Into<impl Iterator<Item = impl AsRef<str>>>>(it: It) -> Result<Self, ContextError> {
         let container = it
+            .into()
             .map(|item| {
                 Ok(castaway::match_type!(item, {
                     String as s => CString::from_vec_with_nul(s.into_bytes())?,
