@@ -12,4 +12,6 @@ members = [
     # "crates/effectio",
     "crates/infer",
     "crates/qdom"
-]
+, "crates/safe-krun"]
+
+[dependencies]

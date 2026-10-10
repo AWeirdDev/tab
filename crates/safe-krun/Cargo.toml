@@ -1,0 +1,9 @@
+[package]
+name = "safe-krun"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+castaway = "0.2.4"
+krun-sys = "1.10.1"
+thiserror = "2.0.21"
