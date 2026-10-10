@@ -13,20 +13,22 @@ use crate::error_primitives::{ReferToLog, fallible};
 #[derive(Debug)]
 pub struct Context {
     id: u32,
-    deconstructors: Vec<Box<dyn std::any::Any>>,
+    // deconstructors: Vec<Box<dyn std::any::Any>>,
+    // their impl doesn't store the pointers
+    // they *do* copy them
 }
 
 impl Context {
-    fn will_deconstruct<T: 'static>(&mut self, owned: T) {
-        self.deconstructors.push(Box::new(owned));
-    }
+    // fn will_deconstruct<T: 'static>(&mut self, owned: T) {
+    //     self.deconstructors.push(Box::new(owned));
+    // }
 
     pub fn new() -> Result<Self, ContextError> {
         let maybe_ctx = unsafe { sys::krun_create_ctx() };
         match fallible(maybe_ctx) {
             Some(id) => Ok(Self {
                 id: id as u32,
-                deconstructors: Vec::with_capacity(3),
+                // deconstructors: Vec::with_capacity(3),
             }),
             None => Err(ReferToLog.into()),
         }
@@ -38,17 +40,17 @@ impl Context {
             .ok_or(ReferToLog.into())
     }
 
-    pub fn with_root<P: AsRef<Path>>(mut self, root: P) -> Result<Self, ContextError> {
+    pub fn with_root<P: AsRef<Path>>(self, root: P) -> Result<Self, ContextError> {
         let root = cstring_path(root)?;
         unsafe { sys::krun_set_root(self.id, root.as_ptr()) };
-        self.will_deconstruct(root);
+        // self.will_deconstruct(root);
         Ok(self)
     }
 
-    pub fn with_workdir<P: AsRef<Path>>(mut self, root: P) -> Result<Self, ContextError> {
+    pub fn with_workdir<P: AsRef<Path>>(self, root: P) -> Result<Self, ContextError> {
         let dir = cstring_path(root)?;
         unsafe { sys::krun_set_workdir(self.id, dir.as_ptr()) };
-        self.will_deconstruct(dir);
+        // self.will_deconstruct(dir);
         Ok(self)
     }
 
@@ -65,7 +67,7 @@ impl Context {
     }
 
     pub fn with_exec_envp<P: AsRef<Path>, ArgV, EnvP>(
-        mut self,
+        self,
         executable: P,
         argv: ArgV,
         envp: EnvP,
@@ -90,9 +92,9 @@ impl Context {
             );
         }
 
-        self.will_deconstruct(argv_carr);
-        self.will_deconstruct(envp_carr);
-        self.will_deconstruct(exe);
+        // self.will_deconstruct(argv_carr);
+        // self.will_deconstruct(envp_carr);
+        // self.will_deconstruct(exe);
 
         Ok(self)
     }
